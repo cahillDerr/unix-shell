@@ -3,6 +3,26 @@
 
 
 
+static int tokenize(const char *src, char toks[Max_Tokens][Max_Line], int *ntoks) {
+  *ntoks = 0;
+  int i = 0;
+  int len = (int)strlen(src);
+
+  while (i < len && *ntoks < Max_Tokens - 1) {
+    while (i < len && (src[i] == ' ' || src[i] == '\t')) i++;
+    if (i >= len) break;
+    int j = 0;
+    if src[i] == '"') {
+      i++;
+      while ( i < len && src[i] != '"')
+          toks[*ntoks][]
+
+
+    }
+
+  }
+}
+
 int main(int argc, char **argv) {
 
   // TODO: Implement your shell's main
@@ -21,6 +41,8 @@ int main(int argc, char **argv) {
     size_t len = strlen(line);
     
   }
+
+
 
 
 }
