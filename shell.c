@@ -3,9 +3,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #define MAX_LINE 255
 #define MAX_TOKENS 128
+
+//the forwardd declaration
+static void execute_command_line(char toks[MAX_TOKENS][MAX_LINE], int ntoks, char prev_line[MAX_LINE]);
 
 //tokenizer that splits a stirng into tokens 
 //white space as seperator and double quoted strings as a single token
@@ -46,6 +51,64 @@ static int tokenize(const char *src, char toks[MAX_TOKENS][MAX_LINE], int *ntoks
     return *ntoks;
 }
 
+
+
+
+
+
+
+//tokens [start to end] will go to null
+//skipps < > operatorss and their filename args
+
+static char **build(char toks[MAX_TOKENS][MAX_LINE], int start, int end) {
+    static har *argv[MAX_TOKENS];
+    int k = 0;
+    for (int i = start; i < i < end; i++) {
+        if (strcmp(toks[i], "<") == 0 || strcmp(toks[i], ">") == 0)
+            i++;
+        else
+            argv[k++] = toks[i];
+    }
+    argv[k] = NULL;
+    return argv;
+}
+
+//find operator op in the tokens [start to end]
+//returns the index of the filename token or -1 if it was not found
+static void redirect(char toks[MAX_TOKENS][MAX_LINE], int start, int end, const char *op) {
+    for (int i = start; i < end - 1; i++) {}
+        if (strcmp(toks[i], op) == 0) {
+            return i + 1;
+        }
+        return -1;
+    }
+}
+
+// opens the fioles and dup2 into stdin and stdout when needed
+//called inside the child process befor exec
+static void use_redirect(char toks[MAX_TOKENS][MAX_LINE], int start, int end) {
+    int in_index = redirect(toks, start, end, "<");
+    if (in_index >= 0) {
+        int fd = open(toks[in_index], O_RDONLY);
+        if (fd < 0) {
+            perror(toks[in_index]);
+            exit(1);
+        }
+        dup2(fd, STDIN_FILENO);
+        close(fd);
+    }
+    int out_index = redirect(toks, start, end, ">");
+    if (out_index >= 0) {
+        int fd = open(toks[out_index], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0) {
+            perror(toks[out_index]);
+            exit(1);
+        }
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+    }
+}
+
 // exec argv on failure and print serror then exits
 //only actually called from inside achild process. 
 static void exec(char **argv[]) {
@@ -54,36 +117,86 @@ static void exec(char **argv[]) {
     exit(1);
 }
 
+//supports cmd 1 2 and 3
+// collects segment boundries by splitting on |
+//creates nseg-1 pipes and forks one child per seg then wire stdin/stdout to the pipes
+//parent closes all pipe fds and waits for all children
 static void execute_pipe(char toks[MAX_TOKENS][MAX_LINE], int start, int end) {
-    int seg_start = [MAX_TOKENS];
-    int seg_end = [MAX_TOKENS];
+    int seg_start[MAX_TOKENS];
+    int seg_end[MAX_TOKENS];
     int nseg = 0;
     int s = start;
-    for (i <= start; i <= end; i++) {
+    for (int i = start; i <= end; i++) {
         if (i == end || strcmp (toks[i], "|") == 0) {
             seg_start[nseg] = s;
             seg_end[nseg] = i;
             nseg++;
             s = i + 1;
+        }
     }
-    //d
+    
     if (nseg == 1) {
         pid_t pid = fork(); //single command  no pipe
         if (pid < 0) {
             perror("fork");
             return; 
         }
-        if (pid == 0){
-            redirect(toks, start, end);
+        if (pid == 0) {
+            use_redirect(toks, start, end);
             char **argv = build(toks, start, end);
             if (argv[0] == NULL) {
                 exit(0);
                 exec(argv);
-            }
-            waitpid(pid, NULL, 0);
-            return;
-        } 
+        }
+        waitpid(pid, NULL, 0);
+        return;
     }
+
+    int pipefd[MAX_TOKENS][2];
+    for (int i = 0; i < nseg -1; i++) {
+        if (pipe(pipefd[i]) < 0) {
+            perror("pipe");
+            return;
+        }
+    }
+
+    pid_t pids[MAX_TOKENS];
+    for (int i = 0; i < nseg; i++) {
+        pids[i] = fork();
+        if (pids[i] < 0) {
+            perror("fork");
+            return;
+        }
+        if (pids[i] == 0) {
+            if (i > 0) {
+                dup2(pipefd[i - 1][0], STDIN_FILENO);
+            }
+            if (i < nseg - 1) {
+                fflush(stdout);
+                dup2(pipefd[i][1], STDOUT_FILENO);
+            }
+            for (int k = 0; k < nseg - 1; k++) {
+                close(pipefd[k][0]);
+                close(pipefd[k][1]);
+            }
+            use_redirect(toks, seg_start[i], seg_end[i]);
+            char **argv = build(toks, seg_start[i], seg_end[i]);
+            if (argv[0] == NULL) {
+                exit(0);
+                exec(argv);
+            }
+        }
+    }
+    for (int i = 0; i < nseg - 1; i++) { //parent close all pipe and wait for children 
+        close(pipefd[i][0]);
+        close(pipefd[i][1]);
+    }
+
+    for (int i = 0; i < nseg; i++) {
+        waitpid(pids[i], NULL, 0);
+    }
+}
+
 }
 
 
