@@ -243,7 +243,7 @@ static void execute_pipe(char toks[MAX_TOKENS][MAX_LINE], int start, int end) {
             if (argv[0] == NULL) {
                 exit(0);
             }
-            exec(argv);
+            exec_cmd(argv);
         }
     }
     for (int i = 0; i < nseg - 1; i++) { //parent close all pipe and wait for children 
@@ -339,6 +339,7 @@ int main(int argc, char **argv) {
 
         if (fgets(line, sizeof(line), stdin) == NULL) {
             printf("\nBye bye.\n"); 
+            fflush(stdout);
             break;
         }
         size_t len = strlen(line);
