@@ -116,7 +116,7 @@ static int is_builtin(const char *name) {
 
 
 //tokens [start to end] will go to null
-//skipps < > operatorss and their filename args
+//skipps < > operatorss and their filename args so exevp only sees the actual cmd
 
 static char **build(char toks[MAX_TOKENS][MAX_LINE], int start, int end) {
     static char *argv[MAX_TOKENS];
@@ -228,15 +228,15 @@ static void execute_pipe(char toks[MAX_TOKENS][MAX_LINE], int start, int end) {
         }
         if (pids[i] == 0) {
             if (i > 0) {
-                dup2(pipefd[i - 1][0], STDIN_FILENO);
+                dup2(pipefd[i - 1][0], STDIN_FILENO); //hooks stdin to prev pipes reaad end 
             }
             if (i < nseg - 1) {
                 fflush(stdout);
-                dup2(pipefd[i][1], STDOUT_FILENO);
+                dup2(pipefd[i][1], STDOUT_FILENO); //hook stdout to next pipes write  end 
             }
             for (int k = 0; k < nseg - 1; k++) {
                 close(pipefd[k][0]);
-                close(pipefd[k][1]);
+                close(pipefd[k][1]); //then  i have the child close all the pipes
             }
             use_redirect(toks, seg_start[i], seg_end[i]);
             char **argv = build(toks, seg_start[i], seg_end[i]);
@@ -333,7 +333,7 @@ int main(int argc, char **argv) {
     char prev_line[MAX_LINE +1];
     prev_line[0] = '\0';
 
-        while (1) {
+        while (1) { //print prompt, read a line, tokenizze, execute, then repeat until exit or eof
         printf("shell $ ");
         fflush(stdout);
 
