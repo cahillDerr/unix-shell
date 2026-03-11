@@ -1,13 +1,36 @@
-[![Open in Codespaces](https://classroom.github.com/assets/launch-codespace-2972f46106e565e64193e422d61a12cf1da4916b45550586e14ef0a7c637dd04.svg)](https://classroom.github.com/open-in-codespaces?assignment_repo_id=22848648)
-# Project 1: Shell
+# Unix Shell
 
-This is the starter code for [Project 1](https://khoury-cs3650.github.io/p1.html).
+A Unix shell implementation written in C that supports core shell functionality including piping, I/O redirection, background processes, and built-in commands.
 
-The [Makefile](Makefile) contains the following targets:
+## Tech Stack
+- **Language:** C
+- **Build:** Make
+- **Environment:** Linux / macOS
 
-- `make all` - compile everything
-- `make shell` - compile the shell
-- `make shell-tests` - run a few tests against the shell
-- `make test` - compile and run all the tests
-- `make clean` - perform a minimal clean-up of the source tree
+## Features
+- **Piping** — chain commands with `|` (e.g. `ls | grep foo`)
+- **I/O Redirection** — input (`<`) and output (`>`) redirection
+- **Background processes** — run commands with `&` without blocking the shell
+- **Built-in commands** — `cd`, `exit`, and other shell builtins handled natively
+- **Command parsing** — tokenizes and interprets user input correctly across all supported operators
 
+## How to Build & Run
+
+```bash
+make all       # compile everything
+make shell     # compile the shell only
+make test      # compile and run all tests
+make clean     # clean build artifacts
+```
+
+Then run the shell:
+```bash
+./shell
+```
+
+## Implementation Details
+
+- Uses `fork()` and `execvp()` for process creation and execution
+- Pipes implemented with `pipe()` and `dup2()` for file descriptor management
+- Background processes tracked to avoid zombie processes
+- Redirection handled by duplicating file descriptors before `exec`
